@@ -1,4 +1,4 @@
-package pl.kacper.zielinski.domain;
+package pl.kacper.zielinski.domain.segregation;
 
 import java.nio.file.Path;
 
