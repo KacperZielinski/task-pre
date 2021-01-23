@@ -53,7 +53,7 @@ public class FileUtils {
         List<String> lines;
         try {
             lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-            return Integer.parseInt(lines.get(lineNumber));
+            return Integer.parseInt(lines.get(lineNumber - 1));
         } catch (IOException e) {
             e.printStackTrace();
         }
