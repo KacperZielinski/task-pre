@@ -10,12 +10,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
-import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
 
 @Component
 public class Job {
@@ -23,22 +23,22 @@ public class Job {
     @Value("${directory.source}")
     private String directory;
 
-    private String homeDirectory;
+    private final HashMap<String, String> directoryToFullPathMap = new HashMap<>();
 
     @PostConstruct
     public void initCatalogStructure() {
-        homeDirectory = directory + "HOME";
+        String initialDirectoryWithDelimiter = directory + File.separator; // todo zmienc na funkcje
+        directoryToFullPathMap.put("HOME", initialDirectoryWithDelimiter + "HOME");
+        directoryToFullPathMap.put("DEV", initialDirectoryWithDelimiter + "DEV" + File.separator);
+        directoryToFullPathMap.put("TEST", initialDirectoryWithDelimiter + "TEST" + File.separator);
 
-        String initialDirectoryWithDelimiter = directory + File.separator;
         ensureDirectoryExistence(directory);
-        ensureDirectoryExistence(initialDirectoryWithDelimiter + "HOME");
-        ensureDirectoryExistence(initialDirectoryWithDelimiter + "DEV");
-        ensureDirectoryExistence(initialDirectoryWithDelimiter + "TEST");
-
+        directoryToFullPathMap.values().forEach(this::ensureDirectoryExistence);
     }
 
     private void ensureDirectoryExistence(String folderPath) {
         File dir = new File(folderPath);
+        // check is that really a directory not a file!
         if (!dir.exists()) {
             dir.mkdirs();
         }
@@ -46,23 +46,17 @@ public class Job {
 
     @Scheduled(fixedDelay = 1000)
     public void moveFile() throws IOException {
-//        System.out.println(homeDirectory);
-
-        Files.list(Paths.get(homeDirectory))
+        Files.list(Paths.get(directoryToFullPathMap.get("HOME")))
                 .filter(Files::isRegularFile)
-                .forEach(path -> segregateFiles(path));
-
-        // todo here some logic
+                .forEach(this::segregateFiles);
     }
 
     private void segregateFiles(Path path) {
-        // zrobic hashmape i piewrszy napotkany ktory zwroci prawde wykonac
-        System.out.println(path);
-        System.out.println(fileEndsWith(path, ".xml"));
+//        System.out.println(path);
+//        System.out.println(fileEndsWith(path, ".xml"));
 
         if(fileEndsWith(path, ".xml")) {
-            // move to DEV
-
+            moveFileToFolder(path, "DEV");
         } else if(fileEndsWith(path, ".jar")) {
             try {
                 BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
@@ -70,13 +64,13 @@ public class Job {
                 Instant creationDate = attr.creationTime().toInstant();
                 LocalDateTime ldt = LocalDateTime.ofInstant(creationDate, ZoneId.systemDefault());
 
-                System.out.println(ldt.getHour());
+//                System.out.println(ldt.getHour());
                 int creationHour = ldt.getHour();
 
                 if(creationHour % 2 == 0) {
-                    // move to DEV
+                    moveFileToFolder(path, "DEV");
                 } else {
-                    // move to TEST
+                    moveFileToFolder(path, "TEST");
                 }
 
             } catch (IOException e) {
@@ -87,5 +81,26 @@ public class Job {
 
     private boolean fileEndsWith(Path path, String suffix) {
         return path.toString().toLowerCase().endsWith(suffix);
+    }
+
+    private void moveFileToFolder(Path source, String folderName) {
+        try {
+            System.out.println(source);
+            System.out.println(Paths.get(directoryToFullPathMap.get(folderName)));
+
+            String movedFileFullPath = directoryToFullPathMap.get(folderName) +
+                    File.separator +
+                    source.getFileName().toString();
+
+            Files.move(source, Paths.get(movedFileFullPath), StandardCopyOption.REPLACE_EXISTING);
+
+//            source.toFile().renameTo(new File(
+//                    directoryToFullPathMap.get(folderName) +
+//                            File.separator +
+//                            source.getFileName().toString())
+//            );
+        } catch (IOException e) {
+            throw new RuntimeException("Cannot move file:" + source + " to: " + folderName);
+        }
     }
 }
