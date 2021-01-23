@@ -65,6 +65,12 @@ public class FileUtils {
         List<String> lines;
         try {
             lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+            if(lines.isEmpty()) {
+                lines.add(data);
+                lines.add("0");
+                lines.add("0");
+                lines.add("0");
+            }
             lines.set(lineNumber - 1, data);
             Files.write(path, lines, StandardCharsets.UTF_8);
         } catch (IOException e) {
