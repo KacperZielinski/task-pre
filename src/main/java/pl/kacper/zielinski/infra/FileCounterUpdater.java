@@ -18,22 +18,23 @@ public class FileCounterUpdater {
     }
 
     public void updateDevCounter() {
-        int counter = fileUtils.getCounterFromLine(counterPath, 3);
-        counter++;
-
-        fileUtils.writeToFileOnLine(counterPath, 3,  String.valueOf(counter));
-        updateOverallCounter(counter);
+        getCounterAndIncrement(3);
+        updateOverallCounter();
     }
 
     public void updateTestCounter() {
-        int counter = fileUtils.getCounterFromLine(counterPath, 4);
-        counter++;
-
-        fileUtils.writeToFileOnLine(counterPath, 4,  String.valueOf(counter));
-        updateOverallCounter(counter);
+        getCounterAndIncrement(4);
+        updateOverallCounter();
     }
 
-    public void updateOverallCounter(int counter) {
-        fileUtils.writeToFileOnLine(counterPath, 2,  String.valueOf(counter));
+    public void updateOverallCounter() {
+        getCounterAndIncrement(2);
+    }
+
+    private void getCounterAndIncrement(int i) {
+        int counter = fileUtils.getCounterFromLine(counterPath, i);
+        counter++;
+
+        fileUtils.writeToFileOnLine(counterPath, i, String.valueOf(counter));
     }
 }
