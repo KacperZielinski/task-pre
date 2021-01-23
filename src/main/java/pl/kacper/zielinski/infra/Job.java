@@ -27,20 +27,18 @@ public class Job {
 
     @PostConstruct
     public void initCatalogStructure() {
-        String initialDirectoryWithDelimiter = directory + File.separator; // todo zmienc na funkcje
+        String initialDirectoryWithDelimiter = directory + File.separator;
         directoryToFullPathMap.put("HOME", initialDirectoryWithDelimiter + "HOME");
-        directoryToFullPathMap.put("DEV", initialDirectoryWithDelimiter + "DEV" + File.separator);
-        directoryToFullPathMap.put("TEST", initialDirectoryWithDelimiter + "TEST" + File.separator);
+        directoryToFullPathMap.put("DEV", initialDirectoryWithDelimiter + "DEV");
+        directoryToFullPathMap.put("TEST", initialDirectoryWithDelimiter + "TEST");
 
         ensureDirectoryExistence(directory);
         directoryToFullPathMap.values().forEach(this::ensureDirectoryExistence);
     }
 
     private void ensureDirectoryExistence(String folderPath) {
-        File dir = new File(folderPath);
-        // check is that really a directory not a file!
-        if (!dir.exists()) {
-            dir.mkdirs();
+        if (!Files.isDirectory(Paths.get(folderPath))) {
+            new File(folderPath).mkdirs();
         }
     }
 
@@ -52,19 +50,12 @@ public class Job {
     }
 
     private void segregateFiles(Path path) {
-//        System.out.println(path);
-//        System.out.println(fileEndsWith(path, ".xml"));
-
         if(fileEndsWith(path, ".xml")) {
             moveFileToFolder(path, "DEV");
         } else if(fileEndsWith(path, ".jar")) {
             try {
-                BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
-
-                Instant creationDate = attr.creationTime().toInstant();
+                Instant creationDate = Files.readAttributes(path, BasicFileAttributes.class).creationTime().toInstant();
                 LocalDateTime ldt = LocalDateTime.ofInstant(creationDate, ZoneId.systemDefault());
-
-//                System.out.println(ldt.getHour());
                 int creationHour = ldt.getHour();
 
                 if(creationHour % 2 == 0) {
@@ -72,7 +63,6 @@ public class Job {
                 } else {
                     moveFileToFolder(path, "TEST");
                 }
-
             } catch (IOException e) {
                 throw new RuntimeException("Cannot read data file creation time for path: " + path);
             }
@@ -85,20 +75,11 @@ public class Job {
 
     private void moveFileToFolder(Path source, String folderName) {
         try {
-            System.out.println(source);
-            System.out.println(Paths.get(directoryToFullPathMap.get(folderName)));
-
             String movedFileFullPath = directoryToFullPathMap.get(folderName) +
                     File.separator +
                     source.getFileName().toString();
 
             Files.move(source, Paths.get(movedFileFullPath), StandardCopyOption.REPLACE_EXISTING);
-
-//            source.toFile().renameTo(new File(
-//                    directoryToFullPathMap.get(folderName) +
-//                            File.separator +
-//                            source.getFileName().toString())
-//            );
         } catch (IOException e) {
             throw new RuntimeException("Cannot move file:" + source + " to: " + folderName);
         }
