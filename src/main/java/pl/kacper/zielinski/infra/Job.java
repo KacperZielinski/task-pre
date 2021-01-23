@@ -11,10 +11,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.HashMap;
 
 @Component
@@ -23,19 +19,27 @@ public class Job {
     @Value("${directory.source}")
     private String initDirectory;
 
+    private final FileUtils fileUtils = new FileUtils();
     private final HashMap<String, String> directoryToFullPathMap = new HashMap<>();
+    private FileCounterUpdater fileCounterUpdater;
 
     @PostConstruct
     public void initCatalogStructure() {
         createDirectoriesPathMap();
         initializeCatalogStructure();
+        fileCounterUpdater = new FileCounterUpdater(directoryToFullPathMap.get("HOME"));
     }
 
     @Scheduled(fixedDelay = 1000)
-    public void moveFile() throws IOException {
-        Files.list(Paths.get(directoryToFullPathMap.get("HOME")))
-                .filter(Files::isRegularFile)
-                .forEach(this::segregateFiles);
+    public void moveFilesFromHomeDirectory() {
+        try {
+            Files.list(Paths.get(directoryToFullPathMap.get("HOME")))
+                    .filter(Files::isRegularFile)
+                    .filter(file -> !fileUtils.fileEndsWith(file, ".txt"))
+                    .forEach(this::segregateFile);
+        } catch (IOException e) {
+            throw new RuntimeException("Cannot move files from home directory");
+        }
     }
 
     private void createDirectoriesPathMap() {
@@ -51,24 +55,21 @@ public class Job {
         directoryToFullPathMap.values().forEach(csi::initialize);
     }
 
-    private void segregateFiles(Path path) {
-        FileUtils fu = new FileUtils();
-
-        if(fu.fileEndsWith(path, ".xml")) {
-            fu.moveFileToFolder(path, directoryToFullPathMap.get("DEV"));
-        } else if(fu.fileEndsWith(path, ".jar")) {
+    private void segregateFile(Path filepath) {
+        if(fileUtils.fileEndsWith(filepath, ".xml")) {
+            fileUtils.moveFileToFolder(filepath, directoryToFullPathMap.get("DEV"));
+            fileCounterUpdater.updateDevCounter();
+        } else if(fileUtils.fileEndsWith(filepath, ".jar")) {
             try {
-                Instant creationDate = Files.readAttributes(path, BasicFileAttributes.class).creationTime().toInstant();
-                LocalDateTime ldt = LocalDateTime.ofInstant(creationDate, ZoneId.systemDefault());
-                int creationHour = ldt.getHour();
-
-                if(creationHour % 2 == 0) {
-                    fu.moveFileToFolder(path, directoryToFullPathMap.get("DEV"));
+                if(fileUtils.getCreationFileHour(filepath) % 2 == 0) {
+                    fileUtils.moveFileToFolder(filepath, directoryToFullPathMap.get("DEV"));
+                    fileCounterUpdater.updateDevCounter();
                 } else {
-                    fu.moveFileToFolder(path, directoryToFullPathMap.get("TEST"));
+                    fileUtils.moveFileToFolder(filepath, directoryToFullPathMap.get("TEST"));
+                    fileCounterUpdater.updateTestCounter();
                 }
             } catch (IOException e) {
-                throw new RuntimeException("Cannot read data file creation time for path: " + path);
+                throw new RuntimeException("Cannot read data file creation time for path: " + filepath);
             }
         }
     }
